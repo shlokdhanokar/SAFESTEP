@@ -1,19 +1,20 @@
-EMPOWERMENT OF DISABLED INDIVIDUALS
+*EMPOWERMENT OF DISABLED INDIVIDUALS*
 Project Description
 There are nearly 285 million visually impaired people worldwide, many of whom are blind and face numerous challenges in their daily lives. One significant problem they encounter is the inability to detect obstacles in their path, which can lead to serious injuries.
 
 To address this, our team has developed a device that can be attached to various accessories (such as glasses, hats, or walking sticks). This device notifies the user when an object is detected within their path, helping them navigate safely and confidently in their surroundings. It ensures the user knows whether their path is clear, enhancing their independence.
 
 Technology Used
-Hardware:
-Sensors
-Camera
-Speaker (for audio alerts)
-Software:
-Programming Languages: Python, C++
+Hardware:Sensors,Camera,Speaker (for audio alerts)
+
+Software:Programming Languages: Python, C++
+
 Libraries: NumPy, OpenCV (cv2)
+
 Pretrained Machine Learning Model: MobileNet SSD (TensorFlow)
-Setup Instructions
+
+*Setup Instructions*
+
 Hardware Assembly:
 The chip, sensors, and camera must be assembled to work together. The sensors and camera will detect any objects within a 10-meter radius.
 Programming:
