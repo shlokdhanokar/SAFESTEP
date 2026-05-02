@@ -73,7 +73,7 @@ There are nearly **285 million** visually impaired people worldwide, many of who
 
 3. **Run the application**
    ```bash
-   python src/main.py
+   python main.py
    ```
 
 4. **Quit** — Press `Q` to stop the detection feed.
@@ -84,7 +84,7 @@ There are nearly **285 million** visually impaired people worldwide, many of who
 
 ```bash
 # Start obstacle detection with default webcam
-python src/main.py
+python main.py
 ```
 
 - The application opens a video window titled **"Object Detection"**.
@@ -112,8 +112,7 @@ Camera Feed → HSV Conversion → Color Thresholding → Contour Detection → 
 
 ```
 safestep/
-├── src/
-│   └── main.py             # Core detection and alert logic
+├── main.py                 # Core detection and alert logic
 ├── requirements.txt        # Python dependencies
 ├── .gitignore              # Git ignore rules
 ├── LICENSE                 # MIT License
