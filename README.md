@@ -1,41 +1,164 @@
-*EMPOWERMENT OF DISABLED INDIVIDUALS*
-Project Description
-There are nearly 285 million visually impaired people worldwide, many of whom are blind and face numerous challenges in their daily lives. One significant problem they encounter is the inability to detect obstacles in their path, which can lead to serious injuries.
+<p align="center">
+  <h1 align="center">🦯 SafeStep</h1>
+  <p align="center">
+    <strong>Real-Time Obstacle Detection for Visually Impaired Individuals</strong>
+  </p>
+  <p align="center">
+    <a href="#features">Features</a> •
+    <a href="#tech-stack">Tech Stack</a> •
+    <a href="#installation">Installation</a> •
+    <a href="#usage">Usage</a> •
+    <a href="#how-it-works">How It Works</a> •
+    <a href="#future-enhancements">Roadmap</a>
+  </p>
+</p>
 
-To address this, our team has developed a device that can be attached to various accessories (such as glasses, hats, or walking sticks). This device notifies the user when an object is detected within their path, helping them navigate safely and confidently in their surroundings. It ensures the user knows whether their path is clear, enhancing their independence.
+---
 
-Technology Used
-Hardware:Sensors,Camera,Speaker (for audio alerts)
+## 📖 About
 
-Software:Programming Languages: Python, C++
+There are nearly **285 million** visually impaired people worldwide, many of whom face the daily challenge of detecting obstacles in their path — leading to potential injuries and reduced independence.
 
-Libraries: NumPy, OpenCV (cv2)
+**SafeStep** is a wearable assistive device that uses computer vision to detect obstacles in real-time and alerts the user through audio notifications. It can be attached to everyday accessories like **glasses, hats, or walking sticks**, giving users the confidence to navigate their surroundings safely.
 
-Pretrained Machine Learning Model: MobileNet SSD (TensorFlow)
+---
 
-*Setup Instructions*
+## ✨ Features
 
-Hardware Assembly:
-The chip, sensors, and camera must be assembled to work together. The sensors and camera will detect any objects within a 10-meter radius.
-Programming:
-The chip is pre-programmed using Python and C++ to process data from the sensors and camera, ensuring obstacle detection.
-Integration:
-The assembled and programmed chip should be connected to the camera and sensors to function seamlessly.
-Usage Instructions
-Attach the device to any accessory that provides a wide field of view, such as glasses, a hat, or a walking stick.
-When the camera detects an object within a 10-meter range, the device will trigger an audio alert to notify the user, allowing them to navigate safely.
-Theme Fit
-Visually impaired or blind individuals face difficulties in detecting objects around them, leading to accidents. This project aims to mitigate that risk by providing real-time notifications when an obstacle is within a 10-meter radius. This solution empowers them to be more confident and aware of their surroundings, improving their mobility and quality of life.
+- 🎥 **Real-Time Detection** — Continuous video feed processing for instant obstacle awareness
+- 🔊 **Audio Alerts** — Text-to-speech notifications when an object is detected
+- 📦 **Bounding Box Visualization** — Visual overlay highlighting detected objects on-screen
+- 🪶 **Lightweight** — Runs on minimal hardware with low computational overhead
+- 🔌 **Portable** — Designed to attach to glasses, hats, caps, or walking sticks
 
-Future Enhancements
-Voice Assistant: A future improvement could include a voice assistant that specifies the location of obstacles (e.g., left, right, front) and provides directions in the user's preferred language.
-This enhancement will offer more detailed guidance and further improve the user experience by ensuring clarity on where obstacles are located.
+---
 
-By using this device, visually impaired individuals can navigate the world with greater safety and independence.
-Thank you for exploring our project!
+## 🛠️ Tech Stack
 
+| Technology | Purpose |
+|-----------|---------|
+| **Python** | Core application language |
+| **OpenCV** (`cv2`) | Video capture, color-space conversion, contour detection |
+| **NumPy** | Numerical array operations for HSV thresholds |
+| **pyttsx3** | Offline text-to-speech engine for audio alerts |
 
+### Hardware Requirements
 
+- Webcam or USB camera module
+- Speaker or earphone (for audio alerts)
+- Computer or Raspberry Pi to run the script
 
+---
 
+## 📦 Installation
 
+### Prerequisites
+
+- Python 3.7 or higher
+- pip (Python package manager)
+- A connected webcam/camera
+
+### Steps
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/shlokdhanokar/safestep.git
+   cd safestep
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Run the application**
+   ```bash
+   python src/main.py
+   ```
+
+4. **Quit** — Press `Q` to stop the detection feed.
+
+---
+
+## 🚀 Usage
+
+```bash
+# Start obstacle detection with default webcam
+python src/main.py
+```
+
+- The application opens a video window titled **"Object Detection"**.
+- When an obstacle is detected, you will hear **"Object Detected!"** via your speakers.
+- Detected objects are highlighted with **green bounding boxes** on the video feed.
+- Press **`Q`** to quit the application.
+
+---
+
+## 🔬 How It Works
+
+```
+Camera Feed → HSV Conversion → Color Thresholding → Contour Detection → Alert
+```
+
+1. **Video Capture** — Frames are captured from the webcam using OpenCV.
+2. **HSV Conversion** — Each frame is converted from BGR to HSV color space for robust color-based detection.
+3. **Thresholding** — A binary mask is generated using predefined HSV bounds to isolate potential obstacles.
+4. **Contour Detection** — Contours are extracted from the mask to identify object boundaries.
+5. **Alert System** — If contours are found, the pyttsx3 engine speaks an audio alert and bounding boxes are drawn on the frame.
+
+---
+
+## 🗂️ Project Structure
+
+```
+safestep/
+├── src/
+│   └── main.py             # Core detection and alert logic
+├── requirements.txt        # Python dependencies
+├── .gitignore              # Git ignore rules
+├── LICENSE                 # MIT License
+└── README.md               # Project documentation
+```
+
+---
+
+## 🔮 Future Enhancements
+
+- [ ] **Directional Audio** — Indicate obstacle position (left, right, center) with spatial audio cues
+- [ ] **Deep Learning Model** — Replace HSV thresholding with MobileNet SSD or YOLOv8 for robust multi-class object detection
+- [ ] **Distance Estimation** — Approximate obstacle distance using object size in frame
+- [ ] **Multilingual Voice** — Support for alerts in multiple languages
+- [ ] **Raspberry Pi Deployment** — Optimized build for portable, battery-powered hardware
+- [ ] **Alert Cooldown** — Prevent repeated alerts for the same object within a short time window
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to open an issue or submit a pull request.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgements
+
+- [OpenCV](https://opencv.org/) — Open Source Computer Vision Library
+- [pyttsx3](https://pyttsx3.readthedocs.io/) — Offline Text-to-Speech Library
+- [NumPy](https://numpy.org/) — Fundamental Package for Scientific Computing
+
+---
+
+<p align="center">
+  Built with ❤️ to empower independence for visually impaired individuals
+</p>
