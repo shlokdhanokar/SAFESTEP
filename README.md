@@ -15,6 +15,8 @@
 
 ---
 
+
+
 ## 📖 About
 
 There are nearly **285 million** visually impaired people worldwide, many of whom face the daily challenge of detecting obstacles in their path — leading to potential injuries and reduced independence.
