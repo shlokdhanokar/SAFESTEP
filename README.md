@@ -4,6 +4,11 @@
     <strong>Real-Time Obstacle Detection for Visually Impaired Individuals</strong>
   </p>
   <p align="center">
+    <a href="https://github.com/shlokdhanokar/SAFESTEP/actions"><img src="https://github.com/shlokdhanokar/SAFESTEP/actions/workflows/python-app.yml/badge.svg" alt="Build Status"></a>
+    <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.7+-blue.svg" alt="Python 3.7+"></a>
+    <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  </p>
+  <p align="center">
     <a href="#features">Features</a> •
     <a href="#tech-stack">Tech Stack</a> •
     <a href="#installation">Installation</a> •
