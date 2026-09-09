@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeStep · Obstacle Vision</title>
+<style>
+:root{
+  --bg:#04060a; --bg2:#070b11; --panel:#0a1017; --panel2:#0d141d;
+  --line:#16212e; --line2:#1e2c3c;
+  --tx:#cbd9e6; --dim:#5c7186; --dimmer:#33455a;
+  --cyan:#22d3ee; --green:#34d399; --amber:#fbbf24; --red:#f43f5e; --slate:#64748b;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --accent:var(--cyan);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--tx); font-family:var(--sans);
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.4;
+  background-image:linear-gradient(rgba(34,211,238,.03) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(34,211,238,.03) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse at 50% 40%,#000 30%,transparent 85%);
+}
+.shell{position:relative;z-index:1;height:100vh;display:flex;flex-direction:column}
+
+/* ── header ───────────────────────────────────────────── */
+header{
+  display:flex;align-items:center;gap:18px;padding:0 20px;height:58px;
+  border-bottom:1px solid var(--line);background:rgba(7,11,17,.9);backdrop-filter:blur(8px);
+}
+.brand{display:flex;align-items:center;gap:11px;font-weight:650;letter-spacing:.02em;font-size:15px}
+.mark{
+  width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+  background:linear-gradient(140deg,var(--accent),transparent 70%);
+  border:1px solid var(--accent);box-shadow:0 0 16px -4px var(--accent);
+  font-size:13px;transition:.5s;
+}
+.brand small{color:var(--dim);font-weight:400;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.pill{
+  display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+  border:1px solid var(--line2);border-radius:999px;padding:5px 11px;background:var(--panel);
+}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--slate);transition:.3s}
+.dot.on{background:var(--green);box-shadow:0 0 9px var(--green);animation:bp 2s infinite}
+.dot.err{background:var(--red);box-shadow:0 0 9px var(--red)}
+@keyframes bp{0%,100%{opacity:1}50%{opacity:.35}}
+.spacer{flex:1}
+/* Primary run control: deliberately the largest, highest-contrast thing in
+   the header. Stopping capture releases the camera, so it must never be
+   mistaken for a minor toggle. */
+.run{
+  display:flex;align-items:center;gap:9px;cursor:pointer;
+  font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.16em;
+  text-transform:uppercase;padding:10px 22px;border-radius:10px;
+  border:1.5px solid var(--red);background:rgba(244,63,94,.12);color:var(--red);
+  transition:background .2s,color .2s,border-color .2s,box-shadow .2s,transform .1s;
+}
+.run:hover{background:rgba(244,63,94,.22);box-shadow:0 0 22px -6px var(--red)}
+.run:active{transform:scale(.97)}
+.run .gl{width:9px;height:9px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 10px var(--red);animation:bp 1.7s infinite}
+.run.stopped{border-color:var(--green);background:rgba(52,211,153,.12);color:var(--green)}
+.run.stopped:hover{background:rgba(52,211,153,.22);box-shadow:0 0 22px -6px var(--green)}
+.run.stopped .gl{background:var(--green);box-shadow:0 0 10px var(--green);animation:none}
+.run.busy{border-color:var(--amber);background:rgba(251,191,36,.12);color:var(--amber);
+  pointer-events:none}
+.run.busy .gl{background:var(--amber);box-shadow:0 0 10px var(--amber);animation:bp .8s infinite}
+
+/* Animated on/off switches for the secondary options. */
+.tog{
+  display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim);background:var(--panel);border:1px solid var(--line2);
+  border-radius:8px;padding:7px 12px 7px 9px;transition:.2s;
+}
+.tog:hover{color:var(--tx);border-color:var(--dimmer);background:var(--panel2)}
+.tog .sw{
+  position:relative;width:26px;height:14px;border-radius:999px;flex:none;
+  background:var(--line2);transition:background .25s;
+}
+.tog .sw::after{
+  content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;
+  background:var(--dimmer);
+  transition:transform .25s cubic-bezier(.4,.0,.2,1),background .25s;
+}
+.tog.on{color:var(--tx);border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+.tog.on .sw{background:var(--accent)}
+.tog.on .sw::after{transform:translateX(12px);background:#04060a}
+.tog:active .sw::after{width:13px}
+.tog.pulse{animation:glow 1.6s infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(34,211,238,.45)}50%{box-shadow:0 0 0 7px rgba(34,211,238,0)}}
+.sep{width:1px;height:24px;background:var(--line2);margin:0 3px}
+
+/* ── layout ───────────────────────────────────────────── */
+main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:14px;padding:14px;min-height:0}
+.col{display:flex;flex-direction:column;gap:14px;min-height:0;min-width:0}
+.card{
+  background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:1px solid var(--line);border-radius:12px;position:relative;overflow:hidden;
+}
+.card::after{
+  content:'';position:absolute;inset:0;border-radius:12px;pointer-events:none;
+  background:linear-gradient(120deg,transparent 40%,rgba(255,255,255,.025));
+}
+.hd{
+  display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid var(--line);
+  font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+}
+.hd b{color:var(--tx);font-weight:600;letter-spacing:.16em}
+.hd .tag{margin-left:auto;color:var(--dimmer);font-size:9.5px}
+
+/* ── camera ───────────────────────────────────────────── */
+.stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 50%,#080d14,#04060a);position:relative;padding:8px}
+#view{max-width:100%;max-height:100%;border-radius:8px;display:block;
+  box-shadow:0 0 0 1px var(--line2),0 20px 60px -24px #000}
+.nosig{position:absolute;inset:0;display:grid;place-items:center;text-align:center;gap:10px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dimmer)}
+.nosig.hide{display:none}
+.scan{position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  opacity:.5;animation:scan 4.5s linear infinite;pointer-events:none}
+@keyframes scan{0%{top:0}100%{top:100%}}
+
+/* ── bottom strip ─────────────────────────────────────── */
+.strip{display:grid;grid-template-columns:238px minmax(0,1fr);gap:14px;height:210px;flex:none}
+#radar{width:100%;height:100%;display:block}
+.tbl{overflow-y:auto;height:100%;font-family:var(--mono);font-size:11px}
+.tbl table{width:100%;border-collapse:collapse}
+.tbl th{
+  position:sticky;top:0;background:var(--panel);text-align:left;padding:7px 12px;
+  font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dimmer);font-weight:500;
+  border-bottom:1px solid var(--line);
+}
+.tbl td{padding:6px 12px;border-bottom:1px solid rgba(22,33,46,.55);color:var(--tx)}
+.tbl tr:hover td{background:rgba(34,211,238,.04)}
+.chip{display:inline-block;padding:2px 7px;border-radius:5px;font-size:9.5px;letter-spacing:.08em;font-weight:600}
+.empty{padding:26px;text-align:center;color:var(--dimmer);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}
+
+/* ── threat readout ───────────────────────────────────── */
+.threat{padding:16px 18px 18px}
+.tlabel{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.tval{font-size:40px;font-weight:200;letter-spacing:-.02em;line-height:1.05;margin-top:6px;font-family:var(--mono);
+  transition:color .3s}
+.tval .u{font-size:16px;color:var(--dim);margin-left:3px}
+.tsub{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.tsub span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--line2);border-radius:6px;padding:4px 9px;color:var(--dim)}
+.bar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:14px}
+.bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:2px;
+  transition:width .25s cubic-bezier(.4,0,.2,1),background .3s}
+
+/* ── haptics ──────────────────────────────────────────── */
+.hap{padding:16px 18px;display:grid;grid-template-columns:1fr 104px 1fr;gap:14px;align-items:end}
+.motor{display:flex;flex-direction:column;gap:8px}
+.motor .nm{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+.track{height:86px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;
+  position:relative;overflow:hidden;display:flex;align-items:flex-end}
+.fill{width:100%;height:0%;background:linear-gradient(0deg,var(--accent),transparent);
+  border-top:2px solid var(--accent);transition:height .13s linear,border-color .3s,background .3s}
+.pct{font-family:var(--mono);font-size:15px;color:var(--tx);text-align:center}
+.ring{position:relative;display:grid;place-items:center;height:112px}
+.ring svg{transform:rotate(-90deg)}
+.ring .mid{position:absolute;text-align:center}
+.ring .mid b{display:block;font-family:var(--mono);font-size:19px;font-weight:500}
+.ring .mid s{display:block;font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;
+  color:var(--dim);text-decoration:none;text-transform:uppercase;margin-top:2px}
+.hz{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:2px}
+.hz i{width:5px;height:5px;border-radius:50%;background:var(--line2);transition:.1s}
+.hz i.lit{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+
+/* ── audio ────────────────────────────────────────────── */
+#wave{width:100%;height:70px;display:block;background:var(--bg2);border-bottom:1px solid var(--line)}
+.feed{flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:5px;min-height:0}
+.msg{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border-radius:8px;
+  background:var(--bg2);border:1px solid var(--line);border-left-width:2px;animation:in .3s ease}
+@keyframes in{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.msg .tm{font-family:var(--mono);font-size:9.5px;color:var(--dimmer);flex:none;padding-top:2px}
+.msg .bd{flex:1;min-width:0}
+.msg .tx{font-size:12.5px;color:var(--tx);line-height:1.35}
+.msg .mt{font-family:var(--mono);font-size:9.5px;color:var(--dim);margin-top:3px;letter-spacing:.06em}
+.feed .empty{margin:auto}
+
+/* ── consent gate ─────────────────────────────────────── */
+.gate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;
+  background:rgba(4,6,10,.93);backdrop-filter:blur(10px)}
+.gate.hide{display:none}
+.gbox{width:min(520px,92vw);background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:1px solid var(--line2);border-radius:16px;padding:30px;
+  box-shadow:0 30px 90px -30px #000}
+.gbox h2{font-size:19px;font-weight:650;margin-bottom:6px}
+.gbox p{color:var(--dim);font-size:13px;line-height:1.6;margin-bottom:16px}
+.perm{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:10px;
+  background:var(--bg2);border:1px solid var(--line);margin-bottom:9px}
+.perm .ic{font-size:17px;line-height:1.2}
+.perm b{display:block;font-size:12.5px;font-weight:600;margin-bottom:2px}
+.perm span{font-size:11.5px;color:var(--dim);line-height:1.5}
+.gwarn{font-size:11px;color:var(--amber);background:rgba(251,191,36,.07);
+  border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:10px 12px;margin:14px 0 18px;line-height:1.5}
+.grow{display:flex;gap:10px}
+.gbtn{flex:1;padding:12px;border-radius:9px;border:1px solid var(--line2);cursor:pointer;
+  font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  background:var(--panel);color:var(--dim);transition:.18s}
+.gbtn:hover{color:var(--tx);border-color:var(--dimmer)}
+.gbtn.pri{background:var(--cyan);border-color:var(--cyan);color:#04060a;font-weight:700}
+.gbtn.pri:hover{filter:brightness(1.12)}
+
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--dimmer)}
+
+@media(max-width:1180px){
+  main{grid-template-columns:1fr;overflow-y:auto}
+  .strip{height:190px}
+}
+</style>
+</head>
+<body>
+
+<!-- Asked once, then remembered in localStorage. -->
+<div class="gate" id="gate">
+  <div class="gbox">
+    <h2>SafeStep needs your permission</h2>
+    <p>This dashboard turns your camera into an obstacle warning system. Before it starts, here is exactly what it will use.</p>
+
+    <div class="perm">
+      <div class="ic">📷</div>
+      <div><b>Camera</b><span>Opened by SafeStep on this machine to detect obstacles. Frames are shown in this page only — nothing is uploaded, recorded or sent anywhere.</span></div>
+    </div>
+    <div class="perm">
+      <div class="ic">🔊</div>
+      <div><b>Audio output</b><span>Warning tones and spoken alerts, generated in your browser. Your microphone is never accessed.</span></div>
+    </div>
+
+    <div class="gwarn">
+      <b>Not a mobility device.</b> SafeStep is experimental. It misses obstacles — glass, kerbs, drop-offs and anything at head height. Never use it in place of a cane, guide dog or your own judgement.
+    </div>
+
+    <div class="grow">
+      <button class="gbtn" id="gateDeny">Not now</button>
+      <button class="gbtn pri" id="gateAllow">Allow &amp; start</button>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+
+  <header>
+    <div class="brand">
+      <div class="mark" id="mark">◈</div>
+      <div>SafeStep<br><small>Obstacle Vision</small></div>
+    </div>
+    <div class="pill"><i class="dot" id="dot"></i><span id="conn">connecting</span></div>
+    <div class="pill">engine <b id="eng" style="color:var(--tx)">—</b></div>
+    <div class="pill"><span id="fps">0.0</span> fps</div>
+    <div class="pill"><span id="objs">0</span> tracked</div>
+    <div class="spacer"></div>
+    <button class="tog" id="mirrorBtn"><i class="sw"></i>mirror</button>
+    <button class="tog" id="audioBtn"><i class="sw"></i>audio</button>
+    <button class="tog on" id="voiceBtn"><i class="sw"></i>voice</button>
+    <button class="tog on" id="boxBtn"><i class="sw"></i>overlay</button>
+    <div class="sep"></div>
+    <button class="run" id="runBtn"><i class="gl"></i><span id="runTxt">Stop</span></button>
+  </header>
+
+  <main>
+    <!-- left -->
+    <div class="col">
+      <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:0">
+        <div class="hd"><b>Camera Vision</b><span id="srcTag" class="tag">—</span></div>
+        <div class="stage">
+          <canvas id="view"></canvas>
+          <div class="scan"></div>
+          <div class="nosig" id="nosig"><div>◌<br><br>awaiting signal</div></div>
+        </div>
+      </div>
+
+      <div class="strip">
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="hd"><b>Field</b></div>
+          <div style="flex:1;padding:6px"><canvas id="radar"></canvas></div>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column">
+          <div class="hd"><b>Detections</b><span class="tag" id="detCount">0 objects</span></div>
+          <div class="tbl" id="tblWrap">
+            <div class="empty">no objects detected</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- right -->
+    <div class="col">
+      <div class="card">
+        <div class="hd"><b>Nearest Obstacle</b><span class="tag" id="trunc"></span></div>
+        <div class="threat">
+          <div class="tlabel" id="tName">standing by</div>
+          <div class="tval" id="tDist">—<span class="u"></span></div>
+          <div class="tsub">
+            <span id="tBand">—</span><span id="tZone">—</span><span id="tConf">—</span>
+          </div>
+          <div class="bar"><i id="tBar"></i></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd"><b>Haptic Feedback</b><span class="tag" id="hapPat">idle</span></div>
+        <div class="hap">
+          <div class="motor">
+            <div class="nm">◀ left</div>
+            <div class="track"><div class="fill" id="fillL"></div></div>
+            <div class="pct" id="pctL">0%</div>
+          </div>
+          <div>
+            <div class="ring">
+              <svg width="104" height="104">
+                <circle cx="52" cy="52" r="44" fill="none" stroke="#16212e" stroke-width="7"/>
+                <circle cx="52" cy="52" r="44" fill="none" stroke="var(--accent)" stroke-width="7"
+                        stroke-linecap="round" id="arc"
+                        stroke-dasharray="276.5" stroke-dashoffset="276.5"
+                        style="transition:stroke-dashoffset .25s,stroke .3s"/>
+              </svg>
+              <div class="mid"><b id="hapPct">0%</b><s>strength</s></div>
+            </div>
+            <div class="hz" id="hz"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="motor">
+            <div class="nm" style="text-align:right">right ▶</div>
+            <div class="track"><div class="fill" id="fillR"></div></div>
+            <div class="pct" id="pctR">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:0">
+        <div class="hd"><b>Audio · Live Transcript</b><span class="tag" id="audTag">muted</span></div>
+        <canvas id="wave"></canvas>
+        <div class="feed" id="feed"><div class="empty">no alerts yet</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════
+   SafeStep front-end.
+
+   Receives frame + telemetry as one WebSocket message so the
+   overlay can never drift out of sync with the picture, and
+   synthesises the earcons locally with the Web Audio API —
+   which is what makes the waveform a real analyser trace
+   rather than a decorative animation.
+   ══════════════════════════════════════════════════════════ */
+
+const PROX = {
+  IMMEDIATE:{c:'#f43f5e', n:'immediate', f:880, pulses:3, rank:3},
+  NEAR:     {c:'#fbbf24', n:'near',      f:660, pulses:2, rank:2},
+  MODERATE: {c:'#22d3ee', n:'moderate',  f:440, pulses:1, rank:1},
+  FAR:      {c:'#64748b', n:'far',       f:0,   pulses:0, rank:0},
+};
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+/* ── state ─────────────────────────────────────────────── */
+let ws=null, latest=null, smooth=new Map(), lastSeen=new Map();
+let showBoxes=true, voiceOn=true, audioOn=false, running=true, mirrorOn=false;
+let lastAlertAt=0, lastSpokenKey='';
+const dpr = Math.min(window.devicePixelRatio||1, 2);
+
+/* ── canvas helpers ────────────────────────────────────── */
+function fitCanvas(cv, w, h){
+  if(cv.width!==w*dpr || cv.height!==h*dpr){
+    cv.width=w*dpr; cv.height=h*dpr;
+    cv.style.width=w+'px'; cv.style.height=h+'px';
+  }
+  const ctx=cv.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return ctx;
+}
+
+/* ── camera overlay ────────────────────────────────────── */
+const view=$('view'); const vctx=view.getContext('2d');
+const frameImg=new Image();
+let imgReady=false;
+frameImg.onload=()=>{ imgReady=true; };
+
+function drawBrackets(ctx,x,y,w,h,color,lw){
+  const L=clamp(Math.min(w,h)*0.24, 9, 30);
+  ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(x,y+L);       ctx.lineTo(x,y);       ctx.lineTo(x+L,y);
+  ctx.moveTo(x+w-L,y);     ctx.lineTo(x+w,y);     ctx.lineTo(x+w,y+L);
+  ctx.moveTo(x+w,y+h-L);   ctx.lineTo(x+w,y+h);   ctx.lineTo(x+w-L,y+h);
+  ctx.moveTo(x+L,y+h);     ctx.lineTo(x,y+h);     ctx.lineTo(x,y+h-L);
+  ctx.stroke();
+}
+
+function renderView(){
+  requestAnimationFrame(renderView);
+  if(!latest || !imgReady) return;
+
+  const W=latest.width||640, H=latest.height||480;
+  const box=view.parentElement.getBoundingClientRect();
+  const scale=Math.min((box.width-16)/W, (box.height-16)/H);
+  const dw=Math.max(80,W*scale), dh=Math.max(60,H*scale);
+  const ctx=fitCanvas(view,dw,dh);
+  const k=dw/W;
+
+  ctx.clearRect(0,0,dw,dh);
+  ctx.drawImage(frameImg,0,0,dw,dh);
+
+  if(!showBoxes) return;
+
+  // zone guides
+  const cf=(latest.stats&&latest.stats.centerFraction)||0.34;
+  const half=cf*dw/2, mid=dw/2;
+  ctx.save();
+  ctx.strokeStyle='rgba(203,217,230,.16)'; ctx.lineWidth=1; ctx.setLineDash([5,7]);
+  [mid-half, mid+half].forEach(x=>{ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,dh); ctx.stroke(); });
+  ctx.restore();
+
+  // centre crosshair
+  ctx.save();
+  ctx.strokeStyle='rgba(34,211,238,.35)'; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(mid-9,dh/2); ctx.lineTo(mid+9,dh/2);
+  ctx.moveTo(mid,dh/2-9); ctx.lineTo(mid,dh/2+9);
+  ctx.stroke(); ctx.restore();
+
+  const now=performance.now();
+  (latest.detections||[]).forEach(d=>{
+    const key=d.trackId!=null?('t'+d.trackId):(d.label+d.x);
+    const tgt={x:d.x*k,y:d.y*k,w:d.w*k,h:d.h*k};
+    let s=smooth.get(key);
+    // Ease boxes toward their new position: detection may run every Nth
+    // frame, and snapping would read as stutter rather than motion.
+    if(!s){ s={...tgt}; } else {
+      const a=0.4;
+      s={x:s.x+(tgt.x-s.x)*a, y:s.y+(tgt.y-s.y)*a,
+         w:s.w+(tgt.w-s.w)*a, h:s.h+(tgt.h-s.h)*a};
+    }
+    smooth.set(key,s); lastSeen.set(key,now);
+
+    const p=PROX[d.proximity]||PROX.FAR;
+    const urgent=d.proximity==='IMMEDIATE';
+
+    ctx.save();
+    if(urgent){
+      ctx.shadowColor=p.c; ctx.shadowBlur=14;
+      ctx.globalAlpha=0.75+0.25*Math.sin(now/140);
+    }
+    ctx.strokeStyle=p.c; ctx.lineWidth=urgent?2:1.25;
+    ctx.globalAlpha*= .55;
+    ctx.strokeRect(s.x,s.y,s.w,s.h);
+    ctx.globalAlpha=urgent?(0.8+0.2*Math.sin(now/140)):1;
+    drawBrackets(ctx,s.x,s.y,s.w,s.h,p.c,urgent?2.6:2);
+    ctx.restore();
+
+    // label chip
+    const dist=d.distanceM!=null?((d.truncated?'<':'~')+d.distanceM.toFixed(1)+'m'):'—';
+    const txt=`${d.label.toUpperCase()}  ${dist}`;
+    ctx.font='600 10px ui-monospace,Menlo,Consolas,monospace';
+    const tw=ctx.measureText(txt).width+14;
+    const ly=s.y>20?s.y-18:s.y+4;
+    ctx.fillStyle=p.c; ctx.globalAlpha=.92;
+    ctx.beginPath(); ctx.roundRect(s.x, ly, tw, 15, 4); ctx.fill();
+    ctx.globalAlpha=1; ctx.fillStyle='#04060a';
+    ctx.fillText(txt, s.x+7, ly+11);
+  });
+
+  // forget boxes we have not seen for a while
+  for(const [k2,t] of lastSeen) if(now-t>1500){ lastSeen.delete(k2); smooth.delete(k2); }
+}
+requestAnimationFrame(renderView);
+
+/* ── field radar ───────────────────────────────────────── */
+const radar=$('radar');
+function renderRadar(){
+  requestAnimationFrame(renderRadar);
+  const r=radar.parentElement.getBoundingClientRect();
+  const w=r.width-12, h=r.height-12;
+  if(w<10||h<10) return;
+  const ctx=fitCanvas(radar,w,h);
+  ctx.clearRect(0,0,w,h);
+
+  const cx=w/2, cy=h-14, R=Math.min(w/2-8, h-26);
+  const t=performance.now();
+
+  // range rings = the proximity bands
+  [[1,'#f43f5e'],[.62,'#fbbf24'],[.34,'#22d3ee']].forEach(([f,c])=>{
+    ctx.beginPath(); ctx.arc(cx,cy,R*f,Math.PI,0);
+    ctx.strokeStyle=c; ctx.globalAlpha=.16; ctx.lineWidth=1; ctx.stroke();
+  });
+  ctx.globalAlpha=1;
+
+  // Bearing convention: angle 0 points straight up (ahead), positive to the
+  // right. Everything below uses (sin a, -cos a) from the origin at (cx, cy).
+  const ZONE_ANGLE={left:-0.62, center:0, right:0.62};
+  const polar=(a,r)=>[cx+Math.sin(a)*r, cy-Math.cos(a)*r];
+
+  // sector dividers, halfway between the zone bearings
+  ctx.strokeStyle='rgba(203,217,230,.13)'; ctx.lineWidth=1;
+  [-0.31,0.31].forEach(a=>{
+    const [ex,ey]=polar(a,R);
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ex,ey); ctx.stroke();
+  });
+
+  // sweep
+  const sw=-Math.PI/2 + (t/2600 % 1)*Math.PI;
+  const [gx,gy]=polar(sw,R);
+  const g=ctx.createLinearGradient(cx,cy,gx,gy);
+  g.addColorStop(0,'rgba(34,211,238,.30)'); g.addColorStop(1,'rgba(34,211,238,0)');
+  ctx.strokeStyle=g; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(gx,gy); ctx.stroke();
+
+  ctx.fillStyle='#33455a'; ctx.font='8px ui-monospace,monospace';
+  ctx.fillText('L',10,h-4); ctx.fillText('AHEAD',cx-13,h-4); ctx.fillText('R',w-14,h-4);
+
+  if(!latest) return;
+  (latest.detections||[]).forEach(d=>{
+    const p=PROX[d.proximity]||PROX.FAR;
+    const a=ZONE_ANGLE[d.zone]??0;
+    const near=d.distanceM!=null?clamp(1-d.distanceM/7,.12,1):(0.25+p.rank*0.22);
+    const [x,y]=polar(a, R*(1-near)*0.92+8);
+    const puls=d.proximity==='IMMEDIATE'?(3+Math.sin(t/130)*1.6):3;
+
+    ctx.beginPath(); ctx.arc(x,y,puls+5,0,7); ctx.fillStyle=p.c; ctx.globalAlpha=.16; ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,puls,0,7);   ctx.fillStyle=p.c; ctx.globalAlpha=1;   ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+requestAnimationFrame(renderRadar);
+
+/* ── web audio: earcons + analyser ─────────────────────── */
+let actx=null, master=null, analyser=null, waveData=null;
+
+function initAudio(){
+  if(actx) return;
+  actx=new (window.AudioContext||window.webkitAudioContext)();
+  master=actx.createGain(); master.gain.value=0.34;
+  analyser=actx.createAnalyser(); analyser.fftSize=1024;
+  waveData=new Uint8Array(analyser.frequencyBinCount);
+  master.connect(analyser); analyser.connect(actx.destination);
+}
+
+/** Fire an earcon: pitch and pulse count encode urgency, pan encodes side. */
+function earcon(proximity, zone){
+  if(!audioOn||!actx) return;
+  const p=PROX[proximity]; if(!p||!p.f) return;
+  const pan={left:-0.7,center:0,right:0.7}[zone]||0;
+  const t0=actx.currentTime;
+  const dur=0.075, gap=0.05;
+
+  for(let i=0;i<p.pulses;i++){
+    const st=t0+i*(dur+gap);
+    const osc=actx.createOscillator(); osc.type='sine'; osc.frequency.value=p.f;
+    const g=actx.createGain();
+    // Short ramps: a hard start/stop clicks audibly.
+    g.gain.setValueAtTime(0,st);
+    g.gain.linearRampToValueAtTime(1,st+0.008);
+    g.gain.setValueAtTime(1,st+dur-0.008);
+    g.gain.linearRampToValueAtTime(0,st+dur);
+    const pn=actx.createStereoPanner(); pn.pan.value=pan;
+    osc.connect(g); g.connect(pn); pn.connect(master);
+    osc.start(st); osc.stop(st+dur+0.01);
+  }
+}
+
+function speak(text){
+  if(!voiceOn||!audioOn||!window.speechSynthesis) return;
+  const u=new SpeechSynthesisUtterance(text);
+  u.rate=1.15; u.pitch=1; u.volume=1;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+
+const wave=$('wave');
+const HIST=190;
+const levels=new Array(HIST).fill(0);   // scrolling RMS history
+
+function renderWave(){
+  requestAnimationFrame(renderWave);
+  const r=wave.getBoundingClientRect();
+  if(r.width<10) return;
+  const ctx=fitCanvas(wave,r.width,r.height);
+  const w=r.width,h=r.height,mid=h/2;
+  ctx.clearRect(0,0,w,h);
+
+  // Sample the analyser into a scrolling history rather than plotting the
+  // instantaneous trace: earcons are short bursts, so a live trace reads flat
+  // almost always. A history keeps each burst visible as it scrolls away.
+  let rms=0;
+  if(analyser&&audioOn){
+    analyser.getByteTimeDomainData(waveData);
+    let sum=0;
+    for(let i=0;i<waveData.length;i++){
+      const v=(waveData[i]-128)/128; sum+=v*v;
+    }
+    rms=Math.min(1, Math.sqrt(sum/waveData.length)*3.2);
+  }
+  levels.push(rms); levels.shift();
+
+  ctx.strokeStyle='rgba(203,217,230,.07)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,mid); ctx.lineTo(w,mid); ctx.stroke();
+
+  const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#22d3ee';
+  const bw=w/HIST;
+
+  for(let i=0;i<HIST;i++){
+    const v=levels[i];
+    const x=i*bw;
+    if(v<=0.004){
+      ctx.fillStyle='rgba(92,113,134,.30)';
+      ctx.fillRect(x, mid-0.5, Math.max(1,bw-0.6), 1);
+    }else{
+      const a=v*(mid-4);
+      ctx.fillStyle=accent;
+      ctx.globalAlpha=0.35+0.65*(i/HIST);   // older samples fade out
+      ctx.fillRect(x, mid-a, Math.max(1,bw-0.6), a*2);
+      ctx.globalAlpha=1;
+    }
+  }
+
+  if(!audioOn){
+    ctx.fillStyle='rgba(92,113,134,.75)';
+    ctx.font='9px ui-monospace,Menlo,Consolas,monospace';
+    ctx.fillText('AUDIO MUTED — PRESS ENABLE AUDIO', 10, 14);
+  }
+}
+requestAnimationFrame(renderWave);
+
+/* ── haptics panel ─────────────────────────────────────── */
+const hzDots=[...$('hz').children];
+function renderHaptics(){
+  requestAnimationFrame(renderHaptics);
+  const hp=(latest&&latest.haptics)||{left:0,right:0,pulseHz:0,strength:0,proximity:'FAR'};
+  const p=PROX[hp.proximity]||PROX.FAR;
+
+  // Motors pulse at the cue's rate, so the bars show what the wearer feels.
+  let env=1;
+  if(hp.pulseHz>0){
+    const ph=(performance.now()/1000*hp.pulseHz)%1;
+    env=ph<0.5?1:0.28;
+  }
+  const L=(hp.left||0)*env*100, R=(hp.right||0)*env*100;
+  $('fillL').style.height=L+'%'; $('fillR').style.height=R+'%';
+  $('fillL').style.background=`linear-gradient(0deg,${p.c},transparent)`;
+  $('fillR').style.background=`linear-gradient(0deg,${p.c},transparent)`;
+  $('fillL').style.borderTopColor=p.c; $('fillR').style.borderTopColor=p.c;
+  $('pctL').textContent=Math.round((hp.left||0)*100)+'%';
+  $('pctR').textContent=Math.round((hp.right||0)*100)+'%';
+
+  const s=hp.strength||0;
+  $('hapPct').textContent=Math.round(s*100)+'%';
+  $('arc').style.strokeDashoffset=(276.5*(1-s)).toFixed(1);
+  $('arc').style.stroke=p.c;
+  $('hapPat').textContent=hp.active?`${p.n} · ${hp.pulseHz}Hz`:'idle';
+
+  const lit=hp.pulseHz>0?Math.round(hp.pulseHz):0;
+  hzDots.forEach((d,i)=>d.classList.toggle('lit', i<lit && env>0.5));
+}
+requestAnimationFrame(renderHaptics);
+
+/* ── panels ────────────────────────────────────────────── */
+function setAccent(c){ document.documentElement.style.setProperty('--accent',c); }
+
+function updateThreat(dets){
+  const sorted=[...dets].sort((a,b)=>
+    b.proximityRank-a.proximityRank ||
+    (b.zone==='center')-(a.zone==='center') || b.w*b.h-a.w*a.h);
+  const d=sorted[0];
+
+  if(!d){
+    $('tName').textContent='standing by'; $('tDist').innerHTML='—<span class="u"></span>';
+    $('tBand').textContent='—'; $('tZone').textContent='—'; $('tConf').textContent='—';
+    $('tBar').style.width='0%'; $('trunc').textContent='';
+    $('tDist').style.color='var(--tx)'; setAccent('#22d3ee');
+    return;
+  }
+  const p=PROX[d.proximity]||PROX.FAR;
+  $('tName').textContent=d.label;
+  $('tDist').innerHTML = d.distanceM!=null
+    ? `${d.truncated?'&lt;':''}${d.distanceM.toFixed(1)}<span class="u">m</span>`
+    : `—<span class="u"></span>`;
+  $('tDist').style.color=p.c;
+  $('tBand').textContent=p.n;
+  $('tZone').textContent=d.zone;
+  $('tConf').textContent=Math.round(d.confidence*100)+'% conf';
+  $('tBar').style.width=(25+d.proximityRank*25)+'%';
+  $('tBar').style.background=p.c;
+  $('trunc').textContent=d.truncated?'⚠ upper bound':'';
+  setAccent(p.c);
+  $('mark').style.borderColor=p.c;
+}
+
+let tableKey='', transcriptKey='';
+
+function updateTable(dets){
+  const wrap=$('tblWrap');
+  $('detCount').textContent=`${dets.length} object${dets.length===1?'':'s'}`;
+
+  // Rebuild only when something meaningful changed. Re-writing innerHTML at
+  // the frame rate churns the DOM pointlessly and kills text selection.
+  const key=dets.map(d=>`${d.trackId}:${d.proximity}:${d.distanceM}:${d.zone}`).join('|');
+  if(key===tableKey) return;
+  tableKey=key;
+
+  if(!dets.length){ wrap.innerHTML='<div class="empty">no objects detected</div>'; return; }
+
+  const rows=[...dets].sort((a,b)=>b.proximityRank-a.proximityRank).map(d=>{
+    const p=PROX[d.proximity]||PROX.FAR;
+    const dist=d.distanceM!=null?`${d.truncated?'&lt;':'~'}${d.distanceM.toFixed(1)} m`:'—';
+    return `<tr>
+      <td style="color:var(--dimmer)">#${d.trackId??'–'}</td>
+      <td style="font-weight:600">${d.label}</td>
+      <td><span class="chip" style="background:${p.c}22;color:${p.c}">${p.n}</span></td>
+      <td>${dist}</td>
+      <td style="color:var(--dimmer)">${d.distanceMethod||'—'}</td>
+      <td style="color:var(--dim)">${d.zone}</td>
+      <td style="color:var(--dim)">${Math.round(d.confidence*100)}%</td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML=`<table><thead><tr>
+      <th>id</th><th>object</th><th>band</th><th>range</th><th>via</th><th>bearing</th><th>conf</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function pushTranscript(entries){
+  const feed=$('feed');
+  if(!entries||!entries.length){ return; }
+
+  // Critical: only redraw when the transcript actually changed. Rewriting
+  // innerHTML every frame restarts the entry fade-in animation continuously,
+  // which pins every message at opacity 0 and leaves the panel looking empty.
+  const key=entries.length+'|'+entries[entries.length-1].at;
+  if(key===transcriptKey) return;
+  transcriptKey=key;
+
+  const html=entries.slice().reverse().map(e=>{
+    const p=PROX[e.proximity]||PROX.FAR;
+    const tm=new Date(e.at*1000).toLocaleTimeString([], {hour12:false});
+    const dist=e.distanceM!=null?` · ${e.distanceM.toFixed(1)}m`:'';
+    return `<div class="msg" style="border-left-color:${p.c}">
+      <div class="tm">${tm}</div>
+      <div class="bd"><div class="tx">${e.text}</div>
+      <div class="mt">${p.n} · ${e.zone}${dist}</div></div>
+    </div>`;
+  }).join('');
+  feed.innerHTML=html;
+}
+
+/* ── websocket ─────────────────────────────────────────── */
+function connect(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen=()=>{
+    if(running){ $('dot').className='dot on'; $('conn').textContent='live'; }
+    // Adopt the server's current mirror setting so --mirror is reflected here.
+    fetch('/api/status').then(r=>r.json()).then(s=>{
+      if(s && s.settings && typeof s.settings.mirror==='boolean'){
+        mirrorOn=s.settings.mirror;
+        $('mirrorBtn').classList.toggle('on',mirrorOn);
+      }
+    }).catch(()=>{});
+  };
+  ws.onclose=()=>{
+    $('dot').className='dot'; $('conn').textContent='reconnecting';
+    $('nosig').classList.remove('hide');
+    setTimeout(connect,1400);
+  };
+  ws.onerror=()=>{ $('dot').className='dot err'; };
+
+  ws.onmessage=ev=>{
+    const m=JSON.parse(ev.data);
+    if(m.type==='idle'){
+      if(m.error){ $('dot').className='dot err'; $('conn').textContent='pipeline error'; }
+      return;
+    }
+    if(!running) return;          // stopped: ignore the tail of the stream
+    latest=m;
+    if(m.frame){
+      frameImg.src='data:image/jpeg;base64,'+m.frame;
+      $('nosig').classList.add('hide');
+      $('dot').className='dot on'; $('conn').textContent='live';
+    }
+
+    const st=m.stats||{};
+    $('fps').textContent=(st.fps??0).toFixed(1);
+    $('eng').textContent=st.detector||'—';
+    $('objs').textContent=(m.detections||[]).length;
+    $('srcTag').textContent=`source ${st.source??'—'} · every ${st.detectEveryN??1} frame(s) · ${st.hfov??65}° fov`;
+
+    updateThreat(m.detections||[]);
+    updateTable(m.detections||[]);
+    pushTranscript(m.transcript);
+
+    if(m.alert){
+      const key=m.alert.text+'|'+m.alert.at;
+      if(key!==lastSpokenKey){
+        lastSpokenKey=key;
+        earcon(m.alert.proximity, m.alert.zone);
+        setTimeout(()=>speak(m.alert.text), 130);   // tone first, words behind it
+      }
+    }
+  };
+}
+connect();
+
+/* ── consent gate (asked once) ─────────────────────────── */
+const CONSENT_KEY='safestep.consent.v1';
+
+function enableAudio(on){
+  audioOn=on;
+  if(audioOn){ initAudio(); actx.resume(); }
+  $('audioBtn').classList.toggle('on',audioOn);
+  $('audioBtn').classList.remove('pulse');
+  $('audTag').textContent=audioOn?'live':'muted';
+}
+
+async function control(action){
+  try{
+    const r=await fetch('/api/control/'+action,{method:'POST'});
+    return await r.json();
+  }catch(e){ return null; }
+}
+
+function setRunning(on, busy){
+  running=on;
+  const btn=$('runBtn');
+  btn.classList.toggle('stopped',!on);
+  btn.classList.toggle('busy',!!busy);
+  $('runTxt').textContent=busy?'Starting':(on?'Stop':'Start');
+
+  if(on){
+    // Re-opening a camera takes tens of seconds on some Windows backends.
+    // Say so, rather than leaving the label reading "stopped".
+    $('nosig').classList.remove('hide');
+    $('conn').textContent='starting'; $('dot').className='dot';
+  }else{
+    latest=null; imgReady=false; smooth.clear();
+    $('nosig').classList.remove('hide');
+    $('conn').textContent='stopped'; $('dot').className='dot';
+    updateThreat([]); updateTable([]);
+  }
+}
+
+$('gateAllow').onclick=async()=>{
+  localStorage.setItem(CONSENT_KEY,'granted');
+  $('gate').classList.add('hide');
+  enableAudio(true);            // this click is the gesture browsers require
+  earcon('MODERATE','center');
+  await control('start'); setRunning(true);
+};
+$('gateDeny').onclick=async()=>{
+  localStorage.setItem(CONSENT_KEY,'denied');
+  $('gate').classList.add('hide');
+  await control('stop'); setRunning(false);
+};
+
+(function initConsent(){
+  const prior=localStorage.getItem(CONSENT_KEY);
+  if(prior==='granted'){
+    // Already agreed on a previous visit: do not ask again. Audio still needs
+    // one click, because browsers require a gesture before playing sound.
+    $('gate').classList.add('hide');
+    $('audioBtn').classList.add('pulse');
+    control('start').then(()=>setRunning(true));
+  }else if(prior==='denied'){
+    $('gate').classList.add('hide');
+    control('stop').then(()=>setRunning(false));
+  }
+  // No stored answer: the gate stays up.
+})();
+
+/* ── controls ──────────────────────────────────────────── */
+$('runBtn').onclick=async()=>{
+  const next=!running;
+  if(next) setRunning(true,true);        // "Starting" while the camera opens
+  const st=await control(next?'start':'stop');
+  setRunning(st?st.running:next, next);
+  if(next) setTimeout(()=>{ if(running) setRunning(true,false); }, 1200);
+};
+$('mirrorBtn').onclick=async()=>{
+  mirrorOn=!mirrorOn;
+  $('mirrorBtn').classList.toggle('on',mirrorOn);
+  await control(mirrorOn?'mirror-on':'mirror-off');
+};
+$('audioBtn').onclick=()=>{
+  enableAudio(!audioOn);
+  if(audioOn) earcon('MODERATE','center');
+};
+$('voiceBtn').onclick=()=>{
+  voiceOn=!voiceOn;
+  $('voiceBtn').classList.toggle('on',voiceOn);
+  if(!voiceOn&&window.speechSynthesis) window.speechSynthesis.cancel();
+};
+$('boxBtn').onclick=()=>{
+  showBoxes=!showBoxes;
+  $('boxBtn').classList.toggle('on',showBoxes);
+};
+</script>
+</body>
+</html>
