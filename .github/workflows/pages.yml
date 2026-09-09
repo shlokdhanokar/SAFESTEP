@@ -1,0 +1,71 @@
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let an in-flight deploy finish rather than cancelling it mid-publish.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python deps
+        run: |
+          pip install numpy
+          pip install opencv-python-headless
+
+      # The browser demo re-implements the spatial reasoning, tracking, alert
+      # policy and haptics in JavaScript. Publishing a version that disagrees
+      # with the Python original would mean shipping two different devices
+      # under one name, so the deploy is gated on them matching.
+      - name: Regenerate tables and fixtures from the Python source
+        run: |
+          python scripts/generate_tables.py
+          python scripts/generate_parity_fixtures.py
+
+      - name: Fail if the committed generated files are stale
+        run: git diff --exit-code -- docs/js/tables.mjs tests/fixtures/parity.json
+
+      - name: Python/JavaScript parity
+        run: node scripts/check_parity.mjs
+
+      - name: Check demo assets are present
+        run: |
+          test -f docs/models/yolov8n.onnx || { echo "model missing"; exit 1; }
+          test -f docs/vendor/ort/ort-wasm-simd-threaded.jsep.wasm || { echo "runtime missing"; exit 1; }
+
+  deploy:
+    needs: verify
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4

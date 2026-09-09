@@ -22,3 +22,25 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Test / tooling caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Model weights (fetched via scripts/fetch_models.py, never committed)
+models/*
+!models/.gitkeep
+
+# Local scratch output (synthetic clips, recordings)
+scratch/
+
+# Node (browser demo build tooling only)
+node_modules/
+package-lock.json
+
+# The demo's vendored runtime and model are committed deliberately so GitHub
+# Pages can serve them; the desktop app's models/ stays ignored above.
+!docs/models/
+!docs/models/*.onnx
+!docs/vendor/

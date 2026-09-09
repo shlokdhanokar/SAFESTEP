@@ -10,23 +10,52 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
+    - uses: actions/setup-python@v5
       with:
         python-version: "3.11"
+    - name: Install flake8
+      run: pip install flake8
+    - name: Lint (blocking - syntax errors and undefined names)
+      run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    - name: Lint (advisory - style and complexity)
+      run: flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+        include:
+          # OpenCV 5.0 removed the Caffe importer that the SSD backend needs,
+          # so both major lines are covered: the suite must pass on each, with
+          # the Caffe-only test skipping itself where support is absent.
+          - python-version: "3.11"
+            opencv: "opencv-python-headless<5"
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
-      run: |
-        pip install flake8
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        pip install -r requirements-dev.txt
+        # The GUI build needs libGL, which a CI runner has no use for.
+        pip uninstall -y opencv-python
+        pip install "${{ matrix.opencv || 'opencv-python-headless' }}"
+
+    - name: Report environment
+      run: python -c "import cv2, numpy; print('opencv', cv2.__version__, '| numpy', numpy.__version__)"
+
+    - name: Package imports without a speech driver or display
+      run: python -c "import sys; sys.path.insert(0,'src'); import safestep.app, safestep.cli; print('import OK')"
+
+    - name: Run tests
+      run: pytest -v
