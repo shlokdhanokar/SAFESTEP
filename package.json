@@ -1,0 +1,22 @@
+{
+  "name": "safestep-web-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser demo for SafeStep: YOLOv8 obstacle detection running entirely on-device",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shlokdhanokar/SAFESTEP.git"
+  },
+  "scripts": {
+    "tables": "python scripts/generate_tables.py",
+    "fixtures": "python scripts/generate_parity_fixtures.py",
+    "parity": "node scripts/check_parity.mjs",
+    "vendor": "node scripts/vendor_ort.mjs",
+    "serve": "python -m http.server 8123 --directory docs --bind 127.0.0.1"
+  },
+  "devDependencies": {
+    "onnxruntime-web": "1.20.1"
+  }
+}
